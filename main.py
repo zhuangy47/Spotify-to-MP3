@@ -1,6 +1,7 @@
 import os
 import re
 import json
+from sys import float_repr_style
 import spotipy
 import pafy
 import shutil
@@ -12,16 +13,35 @@ from pytube import YouTube
 #gets current working directory 
 current_directory = os.getcwd()
 
-#prompt
-response = input("Manual or Saved?: ")
-if response.lower() == "manual":
-    cid = input("Enter your Client API ID: ")
-    secret = input("Enter your Client Secret ID=: ")
-    username = input("Enter your username: ")
-else:
-    cid = "c1f5b4e4627240bf8d10ee352d886fd1"
-    secret = "ded59152371e4590ae8954f1f4284809"
-    username = "bocozd7wqp0x70ttrgci5ojpc"
+#prompt stuff
+while True:
+    response = input("Type \"manual\" to manually enter Spotify API credentials, or \"saved\" to read credentials from \"info.txt\"\n> ")
+    if response.lower() == "manual":
+        fhand = open("info.txt", "w")
+        to_write = []
+        cid = input("Enter your Client API ID: ")
+        to_write.append(cid)
+        secret = input("Enter your Client Secret ID: ")
+        to_write.append(secret)
+        username = input("Enter your username (the really long garbled one, not your display name): ")
+        to_write.append(username)
+        fhand.writelines(to_write)
+        fhand.close()
+        break
+    elif response.lower() == "saved":
+        try:
+            fhand = open("info.txt", "r")
+        except:
+            print("No API info saved, please manually enter it.")
+            continue
+        lines = fhand.readlines()
+        fhand.close()
+        cid = lines[0].strip()
+        secret = lines[1].strip()
+        username = lines[2].strip()
+        break
+    else:
+        print("Please enter either \"manual\" or \"saved.\"")
 
 #connects to the spotify api or something
 client_credentials_manager = SpotifyClientCredentials(client_id=cid, client_secret=secret)
@@ -36,10 +56,10 @@ for item in playlists["items"]:
 
 #prompts either to choose a playlist found above or to manually input a playlist ID
 while True:
-    print("Here is a list of your playlists:")
+    print("Here is a list of your playlists:\n")
     for item in playlist_dict.keys():
         print(item)
-    input_playlist = input("Pick a playlist, or type \"manual\" to input a playlist ID: ")
+    input_playlist = input("\nPick a playlist, or type \"manual\" to input a playlist ID: ")
     if input_playlist in str(playlist_dict.keys()):
         playlist_base_id = playlist_dict[input_playlist]
         break
@@ -96,7 +116,11 @@ for song_name_org in song_list:
         try:
             result = pafy.new(id, gdata = False)
         except:
-            print("failed fetch")
+            print("Fetch Failed, trying again with following search result")
+            if index == 3:
+                print("Couldn't download " + song_name)
+                failed_songs.append(song_name_org)
+                break
             continue
         #gets the best quality webm
         webm_audio = result.getbestaudio(preftype = "webm")
@@ -105,8 +129,8 @@ for song_name_org in song_list:
         try:
             webm_audio.download(new_full_dir, quiet = True)
         except:
-            print("failed download")
-            if index == 4:
+            print("Download Failed, trying again with following search result")
+            if index == 3:
                 print("Couldn't download " + song_name)
                 failed_songs.append(song_name_org)
                 break
@@ -114,72 +138,6 @@ for song_name_org in song_list:
         #print("breakpoint")
         break
             
-
-
-'''
-#asdfasdfasdfsausing the song list generated above, the vid id of the first yt search result is stored in url_list
-print("Generating list of video IDS")
-url_list = []
-for search_query in song_list:
-  search_query = search_query.replace(" ", "+")
-  results = YoutubeSearch(search_query, max_results = 1).to_dict()
-  video_id = results[0]["id"]
-  url_list.append(video_id)
-print("Generated list of ids")
-
-
-#converts the yt ids to .webm files 
-print("Downloading audio files (webm)")
-overflow_song_id = []
-overflow_song_names = []
-for index, id in enumerate(url_list):
-    filename = song_list[index][0:63] + ".webm"
-    new_full_dir = current_directory + "/Output/" + new_dir + "/" + filename
-    #gets the video corresponding to the video id
-    try:
-        result = pafy.new(id, gdata = False)
-    except:
-        print("Couldn't fetch " + song_list[index] + ", trying again later")
-        overflow_song_id.append(id)
-        overflow_song_names.append(song_list[index])
-    #getting the best quality audio from the result
-    audio = result.getbestaudio(preftype = "webm")
-    #downloads it to the file path defined above
-    print('\nDownloading ' + song_list[index])
-    try:
-        audio.download(new_full_dir)
-    except:
-        print("Couldn't download " + song_list[index] + ", trying again later")
-        overflow_song_id.append(id)
-        overflow_song_names.append(song_list[index])
-print("Finished downloading audio files (webm), retrying failed files")
-
-
-#Retrys downloading failed files
-print("Downloading failed files (webm)")
-failed_songs = []
-for index, id in enumerate(overflow_song_id):
-    filename = overflow_song_names[index][0:63] + ".webm"
-    new_full_dir = current_directory + "/Output/" + new_dir + "/" + filename
-    #gets the video corresponding to the video id
-    try:
-        result = pafy.new(id, gdata = False)
-    except:
-        print("Couldn't fetch " + overflow_song_names[index])
-        failed_songs.append(overflow_song_names[index])
-        continue
-    #getting the best quality audio from the result
-    audio = result.getbestaudio(preftype = "webm")
-    #downloads it to the file path defined above
-    print('\nDownloading ' + overflow_song_names[index])
-    try:
-        audio.download(new_full_dir)
-    except:
-        print("Couldn't download " + overflow_song_names[index])
-        failed_songs.append(overflow_song_names[index])
-print("Retried")
-'''
-
 
 #force appends .webm to the end of the filename just in case my code done goofed
 new_full_dir = current_directory + "/Output/" + new_dir
